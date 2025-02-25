@@ -1,6 +1,12 @@
-# GitHub Issues Extension
+# GitHub Issue Viewer for VS Code
 
-This VS Code extension allows you to view GitHub issues directly in your editor.
+A Visual Studio Code extension for viewing GitHub issues directly in your editor.
+
+## Setup
+
+1. Install the extension
+2. When you first use the command, VS Code will prompt you to sign in to GitHub
+3. Click "Allow" to grant access to your GitHub account
 
 ## Features
 
@@ -19,56 +25,20 @@ This VS Code extension allows you to view GitHub issues directly in your editor.
 2. Type "Show GitHub Issue"
 3. Select from your assigned issues or enter an issue number manually
 
-## Extension Settings
-
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
 ## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+None yet. You can use the issue tracker on https://github.com/tpaksu/vscode-github-issues to report issues you've found.
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
-
 ### 1.0.0
 
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
+Initial release of the plugin.
 
 ## Following extension guidelines
 
 Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
 
 * [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
 
 **Enjoy!**

@@ -1,10 +1,10 @@
 {
-  "type": "module",
-  "name": "github-issues",
-  "displayName": "GitHub Issues",
-  "description": "View GitHub issues in VS Code",
-  "version": "0.0.1",
+  "name": "github-issue-viewer",
+  "displayName": "GitHub Issue Viewer",
+  "description": "View GitHub issue descriptions in VS Code",
+  "version": "0.0.13",
   "publisher": "tpaksu",
+  "icon": "images/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/tpaksu/vscode-github-issues"
@@ -15,22 +15,38 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "github-issues.showIssue",
+        "command": "github-issue-viewer.showIssue",
         "title": "Show GitHub Issue"
       }
     ]
   },
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "authentication": [
+    {
+      "id": "github",
+      "label": "GitHub Account",
+      "scopes": [
+        "repo",
+        "read:user"
+      ]
+    }
+  ],
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src --ext ts"
+    "lint": "eslint src --ext ts",
+    "package": "rm -rf ./github-issue*.vsix && node scripts/bump-version.js && vsce package",
+    "build": "npm run compile && npm run package"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
@@ -44,6 +60,11 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "@octokit/rest": "^20.1.1"
+    "@octokit/rest": "^19.0.13",
+    "marked": "^15.0.7"
+  },
+  "resolutions": {
+    "@octokit/plugin-paginate-rest": "^8.0.0",
+    "@octokit/plugin-rest-endpoint-methods": "^9.0.0"
   }
 }
