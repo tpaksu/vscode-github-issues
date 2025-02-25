@@ -1,0 +1,49 @@
+{
+  "type": "module",
+  "name": "github-issues",
+  "displayName": "GitHub Issues",
+  "description": "View GitHub issues in VS Code",
+  "version": "0.0.1",
+  "publisher": "tpaksu",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tpaksu/vscode-github-issues"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "github-issues.showIssue",
+        "title": "Show GitHub Issue"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^16.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1"
+  },
+  "dependencies": {
+    "@octokit/rest": "^20.0.2"
+  }
+}
