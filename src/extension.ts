@@ -54,7 +54,7 @@ export function activate(context: vscode.ExtensionContext) {
             const [, owner, repo] = remoteUrlMatch;
 
             try {
-                const issues = await octokit.issues.list({
+                const issues = await octokit.issues.listForRepo({
                     owner,
                     repo,
                     filter: 'assigned', // Changed from 'assigned' to 'all' for testing
