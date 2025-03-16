@@ -15,7 +15,7 @@ async function getGitHubSession(): Promise<vscode.AuthenticationSession> {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-    let disposable = vscode.commands.registerCommand('github-issues.showIssue', async () => {
+    let disposable = vscode.commands.registerCommand('github-issue-viewer.showIssue', async () => {
         try {
             const session = await getGitHubSession();
             if (!session?.accessToken) {
@@ -25,7 +25,7 @@ export function activate(context: vscode.ExtensionContext) {
                     retry
                 );
                 if (result === retry) {
-                    await vscode.commands.executeCommand('github-issues.showIssue');
+                    await vscode.commands.executeCommand('github-issue-viewer.showIssue');
                 }
                 return;
             }
@@ -135,7 +135,7 @@ export function activate(context: vscode.ExtensionContext) {
                 } else if (error.status === 401) {
                     // Force new authentication session
                     await getGitHubSession();
-                    vscode.commands.executeCommand('github-issues.showIssue');
+                    vscode.commands.executeCommand('github-issue-viewer.showIssue');
                 } else {
                     vscode.window.showErrorMessage(`GitHub API Error: ${error.message}`);
                 }
@@ -147,7 +147,7 @@ export function activate(context: vscode.ExtensionContext) {
                 retry
             );
             if (result === retry) {
-                await vscode.commands.executeCommand('github-issues.showIssue');
+                await vscode.commands.executeCommand('github-issue-viewer.showIssue');
             }
         }
     });
