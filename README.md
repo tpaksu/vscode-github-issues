@@ -16,6 +16,7 @@ A Visual Studio Code extension for viewing GitHub issues directly in your editor
 
 ## Requirements
 
+- Branch names containing the issue number
 - VS Code 1.85.0 or higher
 - Git repository connected to GitHub
 
@@ -31,14 +32,4 @@ None yet. You can use the issue tracker on https://github.com/tpaksu/vscode-gith
 
 ## Release Notes
 
-### 1.0.0
-
-Initial release of the plugin.
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-**Enjoy!**
+View [CHANGELOG.md](./CHANGELOG.md) file for a list of changes.
