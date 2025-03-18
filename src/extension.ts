@@ -95,7 +95,35 @@ export function activate(context: vscode.ExtensionContext) {
                     owner,
                     repo,
                     issue_number: parseInt(issueNumber),
+                    mediaType: {
+                        format: 'html',
+                    },
                 });
+
+                console.log(issue);
+
+                // Fetch comments for the issue (discussion)
+                const commentsRes = await octokit.issues.listComments({
+                    owner,
+                    repo,
+                    issue_number: parseInt(issueNumber),
+                    mediaType: {
+                        format: 'html',
+                    },
+                });
+
+                const discussion = commentsRes.data.length
+                    ? commentsRes.data
+                          .map(
+                              (comment) => `
+                        <div class="comment">
+                            <p><strong>${comment.user?.login}</strong> commented:</p>
+                            <p>${comment.body_html}</p>
+                        </div>
+                    `
+                          )
+                          .join('')
+                    : '<p>No discussion available.</p>';
 
                 const panel = vscode.window.createWebviewPanel(
                     'githubIssue',
@@ -104,19 +132,77 @@ export function activate(context: vscode.ExtensionContext) {
                     {}
                 );
 
-                const body = marked.parse(issue.data.body || '');
+                const body = issue.data.body_html || '<p>No description provided.</p>';
+
+                const issueUrl = `https://github.com/${owner}/${repo}/issues/${issueNumber}`;
 
                 panel.webview.html = `
                     <html>
                         <head>
+                            <meta charset="UTF-8">
+                            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' https: data:;">
                             <style>
                                 body {
-                                    font-family: Arial, sans-serif;
-                                    font-size: 16px;
+                                    font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif);
+                                    background-color: var(--vscode-editor-background, #f6f8fa);
+                                    color: var(--vscode-editor-foreground, #24292e);
+                                    margin: 0;
+                                    padding: 0 16px;
+                                    line-height: 1.5;
+                                }
+                                .container {
+                                    max-width: 1000px; /* Increased max-width */
+                                    margin: 20px auto;
+                                    overflow: hidden;
+                                    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+                                }
+                                .header {
+                                    padding: 20px 0;
+                                    display: flex; /* Use flexbox for header elements */
+                                    justify-content: space-between; /* Distribute space evenly */
+                                    align-items: center; /* Vertically align items */
+                                }
+                                .header a {
+                                    color: var(--vscode-linkColor, #ffffff);
+                                    text-decoration: none;
+                                }
+                                .header h1 {
+                                    margin: 0;
+                                    font-size: 24px; /* Adjusted font size */
+                                    font-weight: 600;
+                                }
+                                .issue-number {
+                                    font-size: 16px; /* Added issue number styling */
+                                    color: var(--vscode-secondary-foreground, #586069);
+                                }
+                                .content {
+                                    padding: 20px;
+                                    background-color: var(--vscode-editor-background, #fff);
+                                    border: 1px solid var(--vscode-editorGroup-border, #e1e4e8);
+                                    border-radius: 6px;
+
+                                }
+                                .discussion {
+                                }
+                                .discussion h2 {
+                                    margin-top: 40px;
+                                    font-size: 20px;
+                                    font-weight: 600;
+                                    margin-bottom: 15px; /* Added margin below heading */
+                                }
+                                .comment {
+                                    margin-bottom: 20px;
+                                    background-color: var(--vscode-editor-background, #fff);
+                                    border: 1px solid var(--vscode-editorGroup-border, #e1e4e8);
+                                    border-radius: 6px;
                                     padding: 20px;
                                 }
-                                h1 {
-                                    font-size: 1.5em;
+                                .comment p {
+                                    margin: 0;
+                                    padding: 0;
+                                }
+                                .comment strong {
+                                    font-weight: 600; /* Bold commenter's name */
                                 }
                                 img {
                                     max-width: 100%;
@@ -124,8 +210,20 @@ export function activate(context: vscode.ExtensionContext) {
                             </style>
                         </head>
                         <body>
-                            <h1>${issue.data.title}</h1>
-                            <div>${body}</div>
+                            <div class="container">
+                                <div class="header">
+                                    <a href="${issueUrl}" target="_blank">
+                                        <h1>${issue.data.title}</h1>
+                                    </a>
+                                </div>
+                                <div class="content">
+                                    ${body}
+                                </div>
+                                <div class="discussion">
+                                    <h2>Discussion</h2>
+                                    ${discussion}
+                                </div>
+                            </div>
                         </body>
                     </html>
                 `;
