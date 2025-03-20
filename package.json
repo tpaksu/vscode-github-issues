@@ -2,7 +2,7 @@
   "name": "github-issue-viewer",
   "displayName": "GitHub Issue Viewer",
   "description": "View GitHub issue descriptions in VS Code",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "publisher": "tpaksu",
   "icon": "images/icon.png",
   "repository": {
