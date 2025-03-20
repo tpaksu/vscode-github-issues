@@ -185,7 +185,7 @@ export function activate(context: vscode.ExtensionContext) {
                                 .container {
                                     max-width: 1000px;
                                     margin: 0 auto;
-                                    padding: 16px;
+                                    padding: 32px 48px;
                                 }
 
                                 .page-header {
