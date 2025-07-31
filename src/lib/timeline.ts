@@ -54,36 +54,47 @@ interface TimelineEvent {
 
 // Helper functions for common UI patterns
 const formatTimeAgo = (dateStr?: string): string => {
-    if (!dateStr) return 'Unknown time';
+    if (!dateStr) {return 'Unknown time';}
     return timeAgo.format(new Date(dateStr));
 };
 
-const createActorLink = (actor?: TimelineEvent['actor']): string => {
-    if (!actor) return 'Unknown user';
+const createActorBadge = (actor?: TimelineEvent['actor']): string => {
+    if (!actor) {return '';}
     const avatarUrl = actor.avatar_url || 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png';
-    return `<a href="${actor.html_url || '#'}" target="_blank">
-              <div class="timeline-badge">
-                  <img class="avatar" src="${avatarUrl}" alt="${actor.login || 'Unknown'}" />
-              </div>
-              <span class="timeline-item-actor">${actor.login || 'Unknown'}</span>
-            </a>`;
+    return `<div class="timeline-badge">
+                <img class="avatar" src="${avatarUrl}" alt="${actor.login || 'Unknown'}" />
+            </div>`;
+};
+
+const createActorLink = (actor?: TimelineEvent['actor']): string => {
+    if (!actor) {return 'Unknown user';}
+    return `<a href="${actor.html_url || '#'}" target="_blank">${actor.login || 'Unknown'}</a>`;
 };
 
 const createUserLink = (user?: { login?: string; html_url?: string }): string => {
-    if (!user) return 'someone';
+    if (!user) {return 'someone';}
     return `<a href='${user.html_url || '#'}'>${user.login || 'someone'}</a>`;
 };
 
 const createLabelElement = (label?: { name?: string; color?: string }): string => {
-    if (!label) return 'a label';
+    if (!label) {return 'a label';}
     const color = label.color || '767676';
-    return `<div class='timeline-item-label' style='border: 1px solid #${color}; background-color: #${color}80'>${
+    const textColor = getContrastColor('#' + color);
+    return `<span class="timeline-item-label" style="background-color: #${color}; color: ${textColor}; border: 1px solid #${color}30;">${
         label.name || 'Unknown label'
-    }</div>`;
+    }</span>`;
+};
+
+const getContrastColor = (hexColor: string): string => {
+    const r = parseInt(hexColor.substr(1, 2), 16);
+    const g = parseInt(hexColor.substr(3, 2), 16);
+    const b = parseInt(hexColor.substr(5, 2), 16);
+    const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+    return (yiq >= 128) ? '#000000' : '#ffffff';
 };
 
 const createReactionsHtml = (reactions?: any): string => {
-    if (!reactions) return '';
+    if (!reactions) {return '';}
 
     return Object.entries(reactions)
         .map(([reaction, count]: [string, any]) => {
@@ -111,8 +122,8 @@ export default function buildGithubTimeline(timelineRes: any): string {
 
         return timelineRes.data
             .filter((event: any) => {
-                if (!event || typeof event !== 'object') return false;
-                if (event.event === 'mentioned' && !event.hasOwnProperty('source')) return false;
+                if (!event || typeof event !== 'object') {return false;}
+                if (event.event === 'mentioned' && !event.hasOwnProperty('source')) {return false;}
                 return true;
             })
             .map((event: TimelineEvent) => {
@@ -125,14 +136,10 @@ export default function buildGithubTimeline(timelineRes: any): string {
                         const shortSha = (event.sha || '').substring(0, 7);
 
                         return `<div class="timeline-item timeline-item-committed">
-                            <a href="${commitUrl}" target="_blank">
-                                <div class="timeline-badge">
-                                    <img class="avatar" src="${event.actor?.avatar_url || 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png'}" alt="${author}" />
-                                </div>
-                            </a>
+                            ${createActorBadge(event.actor)}
                             <div class="timeline-commit">
                                 <span class="commit-author">${author}</span> committed
-                                <a href="${commitUrl}" target="_blank" class="commit-sha">${shortSha}</a>:
+                                <a href="${commitUrl}" target="_blank" class="commit-sha">${shortSha}</a>
                                 <span class="commit-message">${message}</span>
                                 <span class="comment-date">${formatTimeAgo(event.author?.date || event.created_at)}</span>
                             </div>
@@ -149,20 +156,25 @@ export default function buildGithubTimeline(timelineRes: any): string {
                                                 'reviewed the pull request';
 
                         let output = `<div class="timeline-item timeline-item-reviewed ${reviewStateClass}">
-                            ${createActorLink(event.user || event.actor)} ${reviewStateText}`;
+                            ${createActorBadge(event.user || event.actor)}
+                            <div class="timeline-item-content">
+                                ${createActorLink(event.user || event.actor)} ${reviewStateText}`;
 
                         if (event.body || event.body_html) {
-                            output += `<div class="comment">
-                                <div class="comment-header">
-                                    <strong>${event.user?.login || event.actor?.login || 'Unknown'}</strong>
-                                    <span class="comment-date">${formatTimeAgo(event.submitted_at || event.created_at)}</span>
-                                </div>
-                                <div class="comment-body">
-                                    ${event.body_html || event.body || ''}
-                                </div>
-                            </div>`;
+                            output += `</div>
+                                <div class="comment-container">
+                                    <div class="comment">
+                                        <div class="comment-header">
+                                            <strong>${event.user?.login || event.actor?.login || 'Unknown'}</strong>
+                                            <span class="comment-date">${formatTimeAgo(event.submitted_at || event.created_at)}</span>
+                                        </div>
+                                        <div class="comment-body">
+                                            ${event.body_html || event.body || ''}
+                                        </div>
+                                    </div>
+                                </div>`;
                         } else {
-                            output += ` ${formatTimeAgo(event.submitted_at || event.created_at)}`;
+                            output += ` ${formatTimeAgo(event.submitted_at || event.created_at)}</div>`;
                         }
 
                         output += `</div>`;
@@ -172,13 +184,18 @@ export default function buildGithubTimeline(timelineRes: any): string {
                     // Handle missing actor for non-comment events
                     if (!event.actor && event.event !== 'commented') {
                         return `<div class="timeline-item timeline-item-${event.event || 'unknown'}">
-                            <span>Unknown user performed action: ${event.event || 'unknown'}</span>
+                            <div class="timeline-badge"></div>
+                            <div class="timeline-item-content">
+                                <span>Unknown user performed action: ${event.event || 'unknown'}</span>
+                            </div>
                         </div>`;
                     }
 
                     // Start the timeline item
                     let output = `<div class="timeline-item timeline-item-${event.event || 'unknown'}">
-                        ${createActorLink(event.actor)} `;
+                        ${createActorBadge(event.actor)}
+                        <div class="timeline-item-content">
+                            ${createActorLink(event.actor)} `;
 
                     // Handle the specific event type
                     switch (event.event) {
@@ -330,21 +347,26 @@ export default function buildGithubTimeline(timelineRes: any): string {
                         case 'commented':
                             const reactionsHtml = createReactionsHtml(event.reactions);
 
-                            output += `<div class="comment">
-                                <div class="comment-header">
-                                    <strong>${event.user?.login || 'Unknown'}</strong>
-                                    <span class="comment-date">${formatTimeAgo(event.created_at)}</span>
+                            output = `<div class="timeline-item timeline-item-commented">
+                                <img class="avatar" src="${event.user?.avatar_url || 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png'}" alt="${event.user?.login || 'Unknown'}" />
+                                <div class="comment-container">
+                                    <div class="comment">
+                                        <div class="comment-header">
+                                            <span class="comment-author">${event.user?.login || 'Unknown'}</span>
+                                            <span class="comment-date">${formatTimeAgo(event.created_at)}</span>
+                                        </div>
+                                        <div class="comment-body">
+                                            ${event.body_html || event.body || 'No content'}
+                                        </div>
+                                        ${
+                                            event.reactions?.total_count && event.reactions.total_count > 0
+                                                ? `<div class="comment-reactions">${reactionsHtml}</div>`
+                                                : ''
+                                        }
+                                    </div>
                                 </div>
-                                <div class="comment-body">
-                                    ${event.body_html || event.body || 'No content'}
-                                </div>
-                                ${
-                                    event.reactions?.total_count && event.reactions.total_count > 0
-                                        ? `<div class="comment-reactions">${reactionsHtml}</div>`
-                                        : ''
-                                }
                             </div>`;
-                            break;
+                            return output; // Return early for comments
 
                         // Fallback for unknown events
                         default:
@@ -364,7 +386,7 @@ export default function buildGithubTimeline(timelineRes: any): string {
                         output += ` ${formatTimeAgo(event.created_at)}`;
                     }
 
-                    output += `</div>`;
+                    output += `</div></div>`; // Close timeline-item-content and timeline-item
                     return output;
                 } catch (eventError) {
                     console.error('Error processing timeline event:', eventError);

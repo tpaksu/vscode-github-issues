@@ -2,7 +2,7 @@
   "name": "github-issue-viewer",
   "displayName": "GitHub Issue Viewer",
   "description": "View GitHub issue descriptions in VS Code",
-  "version": "0.2.0",
+  "version": "0.2.4",
   "publisher": "tpaksu",
   "icon": "images/icon.png",
   "repository": {
@@ -44,19 +44,22 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src --ext ts",
+    "test": "vscode-test",
+    "lint": "eslint src",
     "package": "rm -rf ./github-issue*.vsix && node scripts/bump-version.js && vsce package",
     "build": "npm run compile && npm run package"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
     "@types/node": "^16.0.0",
+    "@types/sinon": "^17.0.4",
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^6.15.0",
     "@typescript-eslint/parser": "^6.15.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
     "eslint": "^8.56.0",
+    "sinon": "^21.0.0",
     "typescript": "^5.3.3"
   },
   "dependencies": {

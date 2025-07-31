@@ -6,6 +6,10 @@ import buildWebviewContents from './lib/webview';
 import { OctokitResponse } from '@octokit/types';
 import { components } from '@octokit/openapi-types';
 
+interface IssueQuickPickItem extends vscode.QuickPickItem {
+    number: string;
+}
+
 async function getGitHubSession(): Promise<vscode.AuthenticationSession> {
     const scopes = ['repo', 'read:user'];
     try {
@@ -58,44 +62,141 @@ export function activate(context: vscode.ExtensionContext) {
 
             const [, owner, repo] = remoteUrlMatch;
 
+            // Try to get issue number from current branch name first
+            let issueNumber = await getCurrentBranchIssueNumber(workspaceFolder);
+            
+            if (issueNumber) {
+                // Try to verify the issue exists
+                try {
+                    await octokit.issues.get({
+                        owner,
+                        repo,
+                        issue_number: parseInt(issueNumber),
+                    });
+                    // Issue exists, use it directly
+                } catch (error: any) {
+                    if (error.status === 404) {
+                        // Issue doesn't exist, reset and show selection
+                        issueNumber = null;
+                    } else {
+                        throw error; // Re-throw other errors
+                    }
+                }
+            }
+
+            if (!issueNumber) {
+                try {
+                    const issues = await octokit.issues.listForRepo({
+                        owner,
+                        repo,
+                        filter: 'all',
+                        headers: {
+                            accept: 'application/vnd.github.v3+json',
+                        },
+                    });
+
+                    if (issues.data.length === 0) {
+                        vscode.window.showInformationMessage('No issues found for this repository');
+                        return;
+                    }
+
+                    const quickPick = vscode.window.createQuickPick<IssueQuickPickItem>();
+                    quickPick.items = [
+                        ...issues.data.map((issue): IssueQuickPickItem => ({
+                            label: `#${issue.number} ${issue.title}`,
+                            detail: issue.body?.substring(0, 100) + (issue.body && issue.body.length > 100 ? '...' : ''),
+                            number: issue.number.toString(),
+                        })),
+                        { label: 'Enter issue number manually', detail: 'Type a specific issue number', number: '' },
+                    ];
+                    quickPick.placeholder = 'Select an issue or type issue number to filter';
+                    quickPick.canSelectMany = false;
+
+                    // Add filtering functionality
+                    quickPick.onDidChangeValue(async (value) => {
+                        const trimmedValue = value.trim();
+                        if (/^\d+$/.test(trimmedValue)) {
+                            // User typed a number, filter issues and add direct selection option
+                            const issueNum = parseInt(trimmedValue);
+                            const filteredIssues = issues.data.filter(issue => 
+                                issue.number.toString().includes(trimmedValue) ||
+                                issue.title.toLowerCase().includes(trimmedValue.toLowerCase())
+                            );
+                            
+                            quickPick.items = [
+                                { label: `#${issueNum} (Direct)`, detail: 'Go directly to this issue number', number: trimmedValue },
+                                ...filteredIssues.map((issue): IssueQuickPickItem => ({
+                                    label: `#${issue.number} ${issue.title}`,
+                                    detail: issue.body?.substring(0, 100) + (issue.body && issue.body.length > 100 ? '...' : ''),
+                                    number: issue.number.toString(),
+                                })),
+                                { label: 'Enter issue number manually', detail: 'Type a specific issue number', number: '' },
+                            ];
+                        } else if (trimmedValue.length > 0) {
+                            // Filter by title/content
+                            const filteredIssues = issues.data.filter(issue => 
+                                issue.title.toLowerCase().includes(trimmedValue.toLowerCase()) ||
+                                issue.body?.toLowerCase().includes(trimmedValue.toLowerCase())
+                            );
+                            quickPick.items = [
+                                ...filteredIssues.map((issue): IssueQuickPickItem => ({
+                                    label: `#${issue.number} ${issue.title}`,
+                                    detail: issue.body?.substring(0, 100) + (issue.body && issue.body.length > 100 ? '...' : ''),
+                                    number: issue.number.toString(),
+                                })),
+                                { label: 'Enter issue number manually', detail: 'Type a specific issue number', number: '' },
+                            ];
+                        } else {
+                            // Reset to full list
+                            quickPick.items = [
+                                ...issues.data.map((issue): IssueQuickPickItem => ({
+                                    label: `#${issue.number} ${issue.title}`,
+                                    detail: issue.body?.substring(0, 100) + (issue.body && issue.body.length > 100 ? '...' : ''),
+                                    number: issue.number.toString(),
+                                })),
+                                { label: 'Enter issue number manually', detail: 'Type a specific issue number', number: '' },
+                            ];
+                        }
+                    });
+
+                    quickPick.show();
+
+                    const selected = await new Promise<IssueQuickPickItem | undefined>((resolve) => {
+                        quickPick.onDidAccept(() => {
+                            const selection = quickPick.selectedItems[0];
+                            quickPick.hide();
+                            resolve(selection);
+                        });
+                        quickPick.onDidHide(() => {
+                            resolve(undefined);
+                        });
+                    });
+
+                    issueNumber =
+                        selected?.number ||
+                        (await vscode.window.showInputBox({
+                            placeHolder: 'Enter issue number',
+                            prompt: 'Please enter the GitHub issue number',
+                        })) || null;
+
+                    if (!issueNumber) {
+                        return;
+                    }
+                } catch (error: any) {
+                    if (error.status === 404) {
+                        vscode.window.showErrorMessage("Repository not found or you don't have access to it");
+                    } else if (error.status === 401) {
+                        // Force new authentication session
+                        await getGitHubSession();
+                        vscode.commands.executeCommand('github-issue-viewer.showIssue');
+                    } else {
+                        vscode.window.showErrorMessage(`GitHub API Error: ${error.message}`);
+                    }
+                    return;
+                }
+            }
+
             try {
-                const issues = await octokit.issues.listForRepo({
-                    owner,
-                    repo,
-                    filter: 'assigned', // Changed from 'assigned' to 'all' for testing
-                    headers: {
-                        accept: 'application/vnd.github.v3+json',
-                    },
-                });
-
-                if (issues.data.length === 0) {
-                    vscode.window.showInformationMessage('No issues found for this repository');
-                    return;
-                }
-
-                const items = [
-                    ...issues.data.map((issue) => ({
-                        label: `#${issue.number} ${issue.title}`,
-                        number: issue.number.toString(),
-                    })),
-                    { label: 'Enter issue number manually', number: '' },
-                ];
-
-                const selected = await vscode.window.showQuickPick(items, {
-                    placeHolder: 'Select an issue or enter manually',
-                });
-
-                const issueNumber =
-                    selected?.number ||
-                    (await vscode.window.showInputBox({
-                        placeHolder: 'Enter issue number',
-                        prompt: 'Please enter the GitHub issue number',
-                    }));
-
-                if (!issueNumber) {
-                    return;
-                }
-
                 const issue = await retrieveIssueData(octokit, owner, repo, issueNumber);
 
                 const timelineRes = await retrieveTimelineEventsForIssue(octokit, owner, repo, issueNumber);
@@ -250,6 +351,65 @@ async function retrieveTimelineEventsForIssue(octokit: Octokit, owner: string, r
     }
 
     return { data: allTimelineEvents } as OctokitResponse<components['schemas']['issue-event'][]>;
+}
+
+// Separate the branch parsing logic for easier testing
+export function parseBranchNameForIssueNumber(branchName: string): string | null {
+    // Parse issue number from branch name patterns like:
+    // - add/123-feature-description
+    // - fix/456-bug-description  
+    // - update/789-enhancement-description
+    // - feature/123-some-feature
+    // - bugfix/456-some-bug
+    // - 123-direct-issue-branch
+    
+    // Pattern 1: [path/]type/[number]-[description] or [path/]type/[number]
+    const typeNumberMatch = branchName.match(/(?:^|.*\/)(?:add|fix|update|feature|bugfix|hotfix|chore)\/(\d+)(?:-|$)/);
+    if (typeNumberMatch) {
+        return typeNumberMatch[1];
+    }
+    
+    // Pattern 2: [number]-[description] (direct issue branch) 
+    const directNumberMatch = branchName.match(/^(\d+)(?:-|$)/);
+    if (directNumberMatch) {
+        return directNumberMatch[1];
+    }
+    
+    // Pattern 3: Any branch containing issue-[number] or #[number]
+    const issueMatch = branchName.match(/(?:issue-|#)(\d+)/);
+    if (issueMatch) {
+        return issueMatch[1];
+    }
+    
+    // Pattern 4: Branch ending with -[number]
+    const endingNumberMatch = branchName.match(/-(\d+)$/);
+    if (endingNumberMatch) {
+        return endingNumberMatch[1];
+    }
+    
+    return null;
+}
+
+export async function getCurrentBranchIssueNumber(workspaceFolder: vscode.WorkspaceFolder): Promise<string | null> {
+    try {
+        // Read the current branch from .git/HEAD
+        const headFile = await vscode.workspace.fs.readFile(
+            vscode.Uri.joinPath(workspaceFolder.uri, '.git', 'HEAD')
+        );
+        const headContent = Buffer.from(headFile).toString('utf8').trim();
+        
+        // Extract branch name from "ref: refs/heads/branch-name"
+        const branchMatch = headContent.match(/ref: refs\/heads\/(.+)/);
+        if (!branchMatch) {
+            return null;
+        }
+        
+        const branchName = branchMatch[1];
+        return parseBranchNameForIssueNumber(branchName);
+    } catch (error) {
+        // Fail silently and return null if we can't read git info
+        return null;
+    }
 }
 
 export function deactivate() {}
