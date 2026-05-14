@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { Buffer } from 'node:buffer';
+import * as path from 'path';
 import { Octokit, RestEndpointMethodTypes } from '@octokit/rest';
 
 import buildGithubTimeline from './lib/timeline';
@@ -9,6 +10,54 @@ import { components } from '@octokit/openapi-types';
 
 interface IssueQuickPickItem extends vscode.QuickPickItem {
     number: string;
+}
+
+// Resolves the git directories for a workspace, handling the `gitdir:` redirect
+// used by linked worktrees, submodules, and other custom layouts where `.git`
+// is a file pointing elsewhere instead of a directory.
+//
+// Returns:
+//   gitDir    — where HEAD lives (per-worktree)
+//   commonDir — where config lives (shared across worktrees)
+export async function resolveGitDirs(
+    workspaceFolder: vscode.WorkspaceFolder
+): Promise<{ gitDir: vscode.Uri; commonDir: vscode.Uri }> {
+    const dotGit = vscode.Uri.joinPath(workspaceFolder.uri, '.git');
+    const stat = await vscode.workspace.fs.stat(dotGit);
+
+    let gitDir: vscode.Uri;
+    if (stat.type === vscode.FileType.Directory) {
+        gitDir = dotGit;
+    } else {
+        const contents = Buffer.from(await vscode.workspace.fs.readFile(dotGit)).toString('utf8');
+        const match = contents.match(/^gitdir:\s*(.+)$/m);
+        if (!match) {
+            throw new Error('.git file does not contain a gitdir: pointer');
+        }
+        const target = match[1].trim();
+        const resolved = path.isAbsolute(target)
+            ? target
+            : path.resolve(workspaceFolder.uri.fsPath, target);
+        gitDir = vscode.Uri.file(resolved);
+    }
+
+    let commonDir = gitDir;
+    try {
+        const commonDirFile = vscode.Uri.joinPath(gitDir, 'commondir');
+        const commonDirContents = Buffer.from(
+            await vscode.workspace.fs.readFile(commonDirFile)
+        )
+            .toString('utf8')
+            .trim();
+        const resolvedCommon = path.isAbsolute(commonDirContents)
+            ? commonDirContents
+            : path.resolve(gitDir.fsPath, commonDirContents);
+        commonDir = vscode.Uri.file(resolvedCommon);
+    } catch {
+        // No commondir file — gitDir is its own common dir.
+    }
+
+    return { gitDir, commonDir };
 }
 
 async function getGitHubSession(): Promise<vscode.AuthenticationSession> {
@@ -51,8 +100,9 @@ export function activate(context: vscode.ExtensionContext) {
             }
 
             // Get repository info from git config
+            const { commonDir } = await resolveGitDirs(workspaceFolder);
             const gitConfig = await vscode.workspace.fs.readFile(
-                vscode.Uri.joinPath(workspaceFolder.uri, '.git', 'config')
+                vscode.Uri.joinPath(commonDir, 'config')
             );
             const configText = Buffer.from(gitConfig).toString('utf8');
             const remoteUrlMatch = configText.match(/url = .*github\.com[:/](.*?)\/(.*?)\.git/);
@@ -377,9 +427,9 @@ export function parseBranchNameForIssueNumber(branchName: string): string | null
 
 export async function getCurrentBranchIssueNumber(workspaceFolder: vscode.WorkspaceFolder): Promise<string | null> {
     try {
-        // Read the current branch from .git/HEAD
+        const { gitDir } = await resolveGitDirs(workspaceFolder);
         const headFile = await vscode.workspace.fs.readFile(
-            vscode.Uri.joinPath(workspaceFolder.uri, '.git', 'HEAD')
+            vscode.Uri.joinPath(gitDir, 'HEAD')
         );
         const headContent = Buffer.from(headFile).toString('utf8').trim();
         
