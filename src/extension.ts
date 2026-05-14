@@ -19,7 +19,7 @@ interface IssueQuickPickItem extends vscode.QuickPickItem {
 // Returns:
 //   gitDir    — where HEAD lives (per-worktree)
 //   commonDir — where config lives (shared across worktrees)
-async function resolveGitDirs(
+export async function resolveGitDirs(
     workspaceFolder: vscode.WorkspaceFolder
 ): Promise<{ gitDir: vscode.Uri; commonDir: vscode.Uri }> {
     const dotGit = vscode.Uri.joinPath(workspaceFolder.uri, '.git');

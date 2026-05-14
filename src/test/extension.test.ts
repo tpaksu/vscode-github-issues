@@ -1,6 +1,9 @@
 import * as assert from 'assert';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import * as vscode from 'vscode';
-import { parseBranchNameForIssueNumber } from '../extension';
+import { parseBranchNameForIssueNumber, resolveGitDirs } from '../extension';
 import buildWebviewContents from '../lib/webview';
 
 function buildMinimalIssueResponse(): any {
@@ -23,6 +26,14 @@ function extractInlineScript(html: string): string {
         throw new Error('no <script> block found in webview HTML');
     }
     return match[1];
+}
+
+function makeWorkspaceFolder(fsPath: string): vscode.WorkspaceFolder {
+    return {
+        uri: vscode.Uri.file(fsPath),
+        name: path.basename(fsPath),
+        index: 0,
+    };
 }
 
 suite('Extension Test Suite', () => {
@@ -255,6 +266,84 @@ suite('Extension Test Suite', () => {
             assert.match(scriptBody, /message\.newComment\.user/);
             assert.match(scriptBody, /message\.newComment\.body_html/);
             assert.match(scriptBody, /message\.newComment\.body\b/);
+        });
+    });
+
+    suite('resolveGitDirs', () => {
+        let tmpRoot: string;
+
+        setup(() => {
+            tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ghi-resolve-'));
+        });
+
+        teardown(() => {
+            fs.rmSync(tmpRoot, { recursive: true, force: true });
+        });
+
+        test('returns .git directory unchanged when .git is a directory', async () => {
+            const workspace = path.join(tmpRoot, 'plain');
+            fs.mkdirSync(path.join(workspace, '.git'), { recursive: true });
+
+            const { gitDir, commonDir } = await resolveGitDirs(makeWorkspaceFolder(workspace));
+
+            assert.strictEqual(gitDir.fsPath, path.join(workspace, '.git'));
+            assert.strictEqual(commonDir.fsPath, path.join(workspace, '.git'));
+        });
+
+        test('follows absolute gitdir: pointer when .git is a file', async () => {
+            const workspace = path.join(tmpRoot, 'with-pointer');
+            const realGit = path.join(tmpRoot, 'real-git');
+            fs.mkdirSync(workspace, { recursive: true });
+            fs.mkdirSync(realGit, { recursive: true });
+            fs.writeFileSync(path.join(workspace, '.git'), `gitdir: ${realGit}\n`);
+
+            const { gitDir, commonDir } = await resolveGitDirs(makeWorkspaceFolder(workspace));
+
+            assert.strictEqual(gitDir.fsPath, realGit);
+            assert.strictEqual(commonDir.fsPath, realGit);
+        });
+
+        test('resolves relative gitdir: pointer against the workspace folder', async () => {
+            const workspace = path.join(tmpRoot, 'submodule-host', 'sub');
+            const realGit = path.join(tmpRoot, 'submodule-host', '.git', 'modules', 'sub');
+            fs.mkdirSync(workspace, { recursive: true });
+            fs.mkdirSync(realGit, { recursive: true });
+            fs.writeFileSync(path.join(workspace, '.git'), 'gitdir: ../.git/modules/sub\n');
+
+            const { gitDir, commonDir } = await resolveGitDirs(makeWorkspaceFolder(workspace));
+
+            assert.strictEqual(gitDir.fsPath, realGit);
+            assert.strictEqual(commonDir.fsPath, realGit);
+        });
+
+        test('honors commondir for linked worktrees', async () => {
+            const main = path.join(tmpRoot, 'main-repo');
+            const mainGit = path.join(main, '.git');
+            const worktreeGit = path.join(mainGit, 'worktrees', 'feature');
+            const workspace = path.join(tmpRoot, 'feature-wt');
+
+            fs.mkdirSync(mainGit, { recursive: true });
+            fs.mkdirSync(worktreeGit, { recursive: true });
+            fs.mkdirSync(workspace, { recursive: true });
+
+            fs.writeFileSync(path.join(workspace, '.git'), `gitdir: ${worktreeGit}\n`);
+            fs.writeFileSync(path.join(worktreeGit, 'commondir'), '../..\n');
+
+            const { gitDir, commonDir } = await resolveGitDirs(makeWorkspaceFolder(workspace));
+
+            assert.strictEqual(gitDir.fsPath, worktreeGit);
+            assert.strictEqual(commonDir.fsPath, mainGit);
+        });
+
+        test('throws when .git file is missing a gitdir: pointer', async () => {
+            const workspace = path.join(tmpRoot, 'malformed');
+            fs.mkdirSync(workspace, { recursive: true });
+            fs.writeFileSync(path.join(workspace, '.git'), 'this is not a gitdir pointer\n');
+
+            await assert.rejects(
+                resolveGitDirs(makeWorkspaceFolder(workspace)),
+                /gitdir:/
+            );
         });
     });
 
