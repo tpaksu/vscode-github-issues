@@ -146,14 +146,18 @@ export function activate(context: vscode.ExtensionContext) {
                         },
                     });
 
-                    if (issues.data.length === 0) {
-                        vscode.window.showInformationMessage('No issues found for this repository');
+                    // GitHub's REST API returns pull requests alongside issues from this endpoint;
+                    // PRs carry a `pull_request` field, real issues don't.
+                    const onlyIssues = issues.data.filter(item => !item.pull_request);
+
+                    if (onlyIssues.length === 0) {
+                        vscode.window.showInformationMessage('No open issues found for this repository');
                         return;
                     }
 
                     const quickPick = vscode.window.createQuickPick<IssueQuickPickItem>();
                     quickPick.items = [
-                        ...issues.data.map((issue): IssueQuickPickItem => ({
+                        ...onlyIssues.map((issue): IssueQuickPickItem => ({
                             label: `#${issue.number} ${issue.title}`,
                             detail: issue.body?.substring(0, 100) + (issue.body && issue.body.length > 100 ? '...' : ''),
                             number: issue.number.toString(),
@@ -169,7 +173,7 @@ export function activate(context: vscode.ExtensionContext) {
                         if (/^\d+$/.test(trimmedValue)) {
                             // User typed a number, filter issues and add direct selection option
                             const issueNum = parseInt(trimmedValue);
-                            const filteredIssues = issues.data.filter(issue => 
+                            const filteredIssues = onlyIssues.filter(issue =>
                                 issue.number.toString().includes(trimmedValue) ||
                                 issue.title.toLowerCase().includes(trimmedValue.toLowerCase())
                             );
@@ -185,7 +189,7 @@ export function activate(context: vscode.ExtensionContext) {
                             ];
                         } else if (trimmedValue.length > 0) {
                             // Filter by title/content
-                            const filteredIssues = issues.data.filter(issue => 
+                            const filteredIssues = onlyIssues.filter(issue =>
                                 issue.title.toLowerCase().includes(trimmedValue.toLowerCase()) ||
                                 issue.body?.toLowerCase().includes(trimmedValue.toLowerCase())
                             );
@@ -200,7 +204,7 @@ export function activate(context: vscode.ExtensionContext) {
                         } else {
                             // Reset to full list
                             quickPick.items = [
-                                ...issues.data.map((issue): IssueQuickPickItem => ({
+                                ...onlyIssues.map((issue): IssueQuickPickItem => ({
                                     label: `#${issue.number} ${issue.title}`,
                                     detail: issue.body?.substring(0, 100) + (issue.body && issue.body.length > 100 ? '...' : ''),
                                     number: issue.number.toString(),
