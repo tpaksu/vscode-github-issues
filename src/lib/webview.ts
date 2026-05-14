@@ -1114,7 +1114,6 @@ export default function buildWebviewContents(
                     });
 
                     // Auto-resize textarea
-                    const textarea = document.getElementById('reply-text');
                     textarea.addEventListener('input', function() {
                         this.style.height = 'auto';
                         this.style.height = Math.max(120, this.scrollHeight) + 'px';

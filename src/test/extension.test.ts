@@ -1,6 +1,29 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { parseBranchNameForIssueNumber } from '../extension';
+import buildWebviewContents from '../lib/webview';
+
+function buildMinimalIssueResponse(): any {
+    return {
+        data: {
+            title: 'Test Issue',
+            user: { login: 'tester', avatar_url: 'https://example.invalid/a.png' },
+            created_at: '2026-05-14T07:00:00Z',
+            body_html: '<p>body</p>',
+            assignees: [],
+            labels: [],
+            milestone: null,
+        },
+    };
+}
+
+function extractInlineScript(html: string): string {
+    const match = html.match(/<script>([\s\S]*?)<\/script>/);
+    if (!match) {
+        throw new Error('no <script> block found in webview HTML');
+    }
+    return match[1];
+}
 
 suite('Extension Test Suite', () => {
     
@@ -193,6 +216,45 @@ suite('Extension Test Suite', () => {
         test('should handle numbers followed by dash then more text', () => {
             const result = parseBranchNameForIssueNumber('999-some-description-here');
             assert.strictEqual(result, '999');
+        });
+    });
+
+    // Regressions for #6: posting a reply silently failed because (a) the
+    // inline webview script had a duplicate `const textarea` that aborted
+    // parsing of the entire <script> block, and (b) the extension posted a
+    // pre-built HTML string while the webview's updateDiscussion handler
+    // expected an object with user/body_html/body fields.
+    suite('webview reply rendering (#6)', () => {
+        test('inline <script> block parses as valid JavaScript', () => {
+            const html = buildWebviewContents(
+                buildMinimalIssueResponse(),
+                1,
+                'https://github.com/example/example/issues/1',
+                ''
+            );
+            const scriptBody = extractInlineScript(html);
+
+            assert.doesNotThrow(
+                () => new Function(scriptBody),
+                'inline webview script must parse — a duplicate `const` or other SyntaxError aborts the whole block and the Comment button stops working'
+            );
+        });
+
+        test('updateDiscussion handler reads the object-shape contract', () => {
+            const html = buildWebviewContents(
+                buildMinimalIssueResponse(),
+                1,
+                'https://github.com/example/example/issues/1',
+                ''
+            );
+            const scriptBody = extractInlineScript(html);
+
+            // The extension posts `newComment: newComment.data` (the raw
+            // octokit response). The webview must read those fields, not
+            // try to inject a pre-built HTML string.
+            assert.match(scriptBody, /message\.newComment\.user/);
+            assert.match(scriptBody, /message\.newComment\.body_html/);
+            assert.match(scriptBody, /message\.newComment\.body\b/);
         });
     });
 
