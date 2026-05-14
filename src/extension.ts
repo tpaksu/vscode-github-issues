@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { Buffer } from 'node:buffer';
 import { Octokit, RestEndpointMethodTypes } from '@octokit/rest';
 
 import buildGithubTimeline from './lib/timeline';
@@ -243,30 +244,14 @@ export function activate(context: vscode.ExtensionContext) {
                                 repo,
                                 issue_number: parseInt(issueNumber),
                                 body: replyText,
+                                mediaType: {
+                                    format: 'html',
+                                },
                             });
                             vscode.window.showInformationMessage('Reply submitted successfully');
                             panel.webview.postMessage({
                                 command: 'updateDiscussion',
-                                newComment: `
-                                    <div class="timeline-item">
-                                        <div class="timeline-badge">
-                                            <img class="avatar" src="${newComment.data.user?.avatar_url}" alt="${
-                                    newComment.data.user?.login
-                                }" />
-                                        </div>
-                                        <div class="comment">
-                                            <div class="comment-header">
-                                                <strong>${newComment.data.user?.login}</strong>
-                                                <span class="comment-date">${new Date(
-                                                    newComment.data.created_at
-                                                ).toLocaleDateString()}</span>
-                                            </div>
-                                            <div class="comment-body">
-                                                ${newComment.data.body_html}
-                                            </div>
-                                        </div>
-                                    </div>
-                                `,
+                                newComment: newComment.data,
                             });
                         } catch (error: any) {
                             vscode.window.showErrorMessage(`Failed to submit reply: ${error.message}`);
